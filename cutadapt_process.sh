@@ -97,6 +97,6 @@ do
 	echo $cutadapt_log
 	echo $R2_CUTADAPT_OUTPUT
 
-	cutadapt -j $threads -a $adapter1 -A $adapter2 -o $R1_CUTADAPT_OUTPUT -p $R2_CUTADAPT_OUTPUT --nextseq-trim=$min_quality -m $min_length -n $cutadapt_count -e $cutadapt_error_rate -o $cutadapt_overlap $R1_FILE $R2_FILE &> $cutadapt_log
+	cutadapt -j $threads -a $adapter1 -A $adapter2 -o $R1_CUTADAPT_OUTPUT -p $R2_CUTADAPT_OUTPUT --nextseq-trim=$min_quality -m $min_length -n $cutadapt_count -e $cutadapt_error_rate -O $cutadapt_overlap $R1_FILE $R2_FILE &> $cutadapt_log
 
 done
