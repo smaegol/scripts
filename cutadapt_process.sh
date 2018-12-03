@@ -92,10 +92,7 @@ do
 	R1_CUTADAPT_OUTPUT=$R1_PREFIX"R1_cutadapt_q"$min_quality"_l"$min_length".fastq.gz"
 	R2_CUTADAPT_OUTPUT=$R1_PREFIX"R2_cutadapt_q"$min_quality"_l"$min_length".fastq.gz"
 	cutadapt_log=$R1_PREFIX"cutadapt.log"
-	echo $R1_FILE
-	echo $R2_FILENAME
-	echo $cutadapt_log
-	echo $R2_CUTADAPT_OUTPUT
+	echo "processing files: $R1_FILE and $R2_FILE"
 
 	cutadapt -j $threads -a $adapter1 -A $adapter2 -o $R1_CUTADAPT_OUTPUT -p $R2_CUTADAPT_OUTPUT --nextseq-trim=$min_quality -m $min_length -n $cutadapt_count -e $cutadapt_error_rate -O $cutadapt_overlap $R1_FILE $R2_FILE &> $cutadapt_log
 
