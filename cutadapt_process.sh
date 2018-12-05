@@ -24,7 +24,10 @@
 ## variables ##
 ### Global variables - do not modify
 INPUT_DIR="." # default input dir - current dir
+OUTPUT_DIR="." # default output dir - current dir
 LIBRARY_TYPE="TruSeqHT" # default library type
+find_maxdepth=1
+filter_quality=1
 #Arrays containing adapter sequences
 declare -A adapter1=( 
  [TruSeqHT]="AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTNNNNNNNNGTGTAGATCTCGGTGGTCGCCGTATCATT"  
@@ -39,7 +42,7 @@ declare -A adapter2=(
 
 ### other variables
 cutadapt_error_rate='0.1' #error rate in overlapping fragment
-cutadapt_count='2' #number of adapters
+cutadapt_count='3' #number of adapters
 cutadapt_overlap='3' #length of min adapter overlap
 
 min_quality='20' #quality threshold 
@@ -47,40 +50,67 @@ min_length='30' #minimum length after trimming
 
 threads='20' #number of parallel threads to use 
 
+NextSeq=1
 
+function help {
+	echo "Cutadapt processing"
+	echo ""
+	echo "Options :"
+	echo " -i : input directory [required]. Can be set as . to process current dir"
+	echo " -o : output dir"
+	echo " -t : threads"
+	echo " -l : library type (one of TruSeqHT (default), Nextera, dUTP)"
+	echo " -q : min quality for filtering"
+	echo " -m : min length (-m option in cutadapt)"
+	echo " -n : adapter count (-n option in cutadapt)"
+	echo " -N : are data coming from NextSeq (default=1, force use of --nextseq_trim instead of -q)"
+	echo " -d : -maxdepth option for find - how deep go into folder structure [default = 1]" 
+	echo " -f : filer by quality and length [default = 1, set to 0 to trim adapters only]"
+	echo " -h : THIS HELP"
+	echo ""
+}
 
 #Get variables from command line
-while getopts ":i:t:h:l:" optname
+while getopts ":h:i:o:l:t:q:n:m:d:f:N:" optname
   do
     case "$optname" in
 	"h")
-		echo "Cutadapt processing"
-		echo ""
-		echo "Options :"
-		echo " -i : input directory"
-		echo " -t : threads"
-		echo " -l : library type (one of TruSeqHT (default), Nextera)"
-		echo " -h : THIS HELP"
-		echo ""
+		help
 		exit 1
 		;;
 	"i")
 		INPUT_DIR=$OPTARG
         	;;
+	"o")
+		OUTPUT_DIR=$OPTARG
+        	;;
 	"l")
 		LIBRARY_TYPE=$OPTARG
-		if [ -n "${adapter1[$LIBRARY_TYPE]}" ]; then
-			adapter1=${adapter1[$LIBRARY_TYPE]}
-			adapter2=${adapter2[$LIBRARY_TYPE]}
-		else
-			echo "Wrong library type provided. Exiting..."
-			exit 1
-		fi
         	;;
 	"t")
         	threads=$OPTARG
 	        ;;
+	"q")
+        	min_quality=$OPTARG
+	        ;;
+	"n")
+        	cutadapt_count=$OPTARG
+	        ;;
+	"m")
+        	min_length=$OPTARG
+	        ;;
+	"d")
+        	find_maxdepth=$OPTARG
+	        ;;
+	"f")
+        	filter_quality=$OPTARG
+	        ;;
+	"N")
+        	NextSeq=$OPTARG
+	        ;;
+
 	"?")
+
         	echo "Unknown option $OPTARG"
         	exit 1 
         	;;
@@ -95,24 +125,71 @@ while getopts ":i:t:h:l:" optname
 		;;
    esac
 done
+if [ $OPTIND -eq 1 ]; then 
+	echo "Please provide options"
+	help
+	exit 1 
+fi
+
+if [ -n "${adapter1[$LIBRARY_TYPE]}" ]; then
+	adapter1=${adapter1[$LIBRARY_TYPE]}
+	adapter2=${adapter2[$LIBRARY_TYPE]}
+else
+	echo "Wrong library type provided. Exiting..."
+	exit 1
+fi
+
+# if using default OUTPUT DIR - set it to INPUT DIR
+if [ "$OUTPUT_DIR" == "." ]; then
+	OUTPUT_DIR=$INPUT_DIR
+fi
+
+if [ ! -d "$OUTPUT_DIR" ]; then
+	echo "Output dir $OUTPUT_DIR does not exists. Creating now..."
+	mkdir $OUTPUT_DIR
+fi
+
+if [ $NextSeq -eq 1 ]; then
+	echo "Setting quality filtering for NextSeq data (--nextseq_trim==$min_quality)"
+	quality_option="--nextseq-trim"
+else
+	echo "Setting quality filtering for data other than NextSeq (--quality-cutoff==$min_quality)"
+	quality_option="--quality-cutoff"
+fi
+
 
 
 #### load modules (on the server I'm using environmental modules. Will load the most recent version of cutadapt (tested on 1.18)
 module load cutadapt
 module load fastqc
 
-for R1_FILE in `find $INPUT_DIR -name "*R1*.fastq*"`
+for R1_FILE in `find $INPUT_DIR -maxdepth $find_maxdepth -name "*R1*.fastq*"`
 do
-	R1_PREFIX=`expr match "$R1_FILE" '\(.*\)R1.*'`
-	R1_SUFFIX=`expr match "$R1_FILE" '.*R1\(.*\)'`
-	R2_FILE=$R1_PREFIX"R2"$R1_SUFFIX
-	R1_CUTADAPT_OUTPUT=$R1_PREFIX"R1_cutadapt_q"$min_quality"_l"$min_length".fastq.gz"
-	R2_CUTADAPT_OUTPUT=$R1_PREFIX"R2_cutadapt_q"$min_quality"_l"$min_length".fastq.gz"
-	cutadapt_log=$R1_PREFIX"cutadapt.log"
+	R1_FILENAME=`expr match "$R1_FILE" '.*\/\(.*\)'`
+	R1_PREFIX=`expr match "$R1_FILENAME" '\(.*\)R1.*'`
+	R1_SUFFIX=`expr match "$R1_FILENAME" '.*R1\(.*\)'`
+	R2_FILE=$INPUT_DIR"/"$R1_PREFIX"R2"$R1_SUFFIX
+	if [ $filter_quality -eq 1 ]; then
+		R1_CUTADAPT_OUTPUT=$OUTPUT_DIR"/"$R1_PREFIX"R1_cutadapt_q"$min_quality"_l"$min_length".fastq.gz"
+		R2_CUTADAPT_OUTPUT=$OUTPUT_DIR"/"$R1_PREFIX"R2_cutadapt_q"$min_quality"_l"$min_length".fastq.gz"
+	else 
+		R1_CUTADAPT_OUTPUT=$OUTPUT_DIR"/"$R1_PREFIX"R1_cutadapt.fastq.gz"
+		R2_CUTADAPT_OUTPUT=$OUTPUT_DIR"/"$R1_PREFIX"R2_cutadapt.fastq.gz"
+	fi
+	cutadapt_log=$OUTPUT_DIR"/"$R1_PREFIX"cutadapt.log"
 	echo "processing files: $R1_FILE and $R2_FILE"
-	if [ ! -e "$R2_CUTADAPT_OUTPUT" ]; then # Run cutadapt only if output is missing	
-		cutadapt -j $threads -a $adapter1 -A $adapter2 -o $R1_CUTADAPT_OUTPUT -p $R2_CUTADAPT_OUTPUT --nextseq-trim=$min_quality -m $min_length -n $cutadapt_count -e $cutadapt_error_rate -O $cutadapt_overlap $R1_FILE $R2_FILE &> $cutadapt_log
+
+	if [ $filter_quality -eq 1 ]; then
+		if [ ! -e "$R2_CUTADAPT_OUTPUT" ]; then # Run cutadapt only if output is missing	
+			cutadapt -j $threads -a $adapter1 -A $adapter2 -o $R1_CUTADAPT_OUTPUT -p $R2_CUTADAPT_OUTPUT $quality_option=$min_quality -m $min_length -n $cutadapt_count -e $cutadapt_error_rate -O $cutadapt_overlap $R1_FILE $R2_FILE &> $cutadapt_log
+		fi
+	else
+echo "cutadapt -j $threads -a $adapter1 -A $adapter2 -o $R1_CUTADAPT_OUTPUT -p $R2_CUTADAPT_OUTPUT $quality_option=$min_quality -m $min_length -n $cutadapt_count -e $cutadapt_error_rate -O $cutadapt_overlap $R1_FILE $R2_FILE &> $cutadapt_log
+"
+		if [ ! -e "$R2_CUTADAPT_OUTPUT" ]; then # Run cutadapt only if output is missing	
+			cutadapt -j $threads -a $adapter1 -A $adapter2 -o $R1_CUTADAPT_OUTPUT -p $R2_CUTADAPT_OUTPUT -n $cutadapt_count -e $cutadapt_error_rate -O $cutadapt_overlap $R1_FILE $R2_FILE &> $cutadapt_log
+		fi
 	fi
 done
 #Perform quality check after filtering
-fastqc -t $threads --noextract $INPUT_DIR/*cutadapt*.fastq.gz
+fastqc -t $threads --noextract $OUTPUT_DIR/*cutadapt*.fastq.gz
