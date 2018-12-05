@@ -1,6 +1,6 @@
 #!/bin/bash
 
-## Preprocessing of fastq reads from NextSeq using cutadapt. Trims adapters, flter by quality and length.
+## Preprocessing of fastq reads from NextSeq using cutadapt. Trims adapters, flter by quality and length. Process all fastq[.gz] files in given folder (and subfolders)
 
 #######################################################################################
 ###                                                                                 ###
@@ -53,19 +53,19 @@ threads='20' #number of parallel threads to use
 NextSeq=1
 
 function help {
-	echo "Cutadapt processing"
+	echo "Cutadapt processing of paired fastq files in given folder"
 	echo ""
 	echo "Options :"
 	echo " -i : input directory [required]. Can be set as . to process current dir"
-	echo " -o : output dir"
-	echo " -t : threads"
-	echo " -l : library type (one of TruSeqHT (default), Nextera, dUTP)"
-	echo " -q : min quality for filtering"
-	echo " -m : min length (-m option in cutadapt)"
-	echo " -n : adapter count (-n option in cutadapt)"
-	echo " -N : are data coming from NextSeq (default=1, force use of --nextseq_trim instead of -q)"
-	echo " -d : -maxdepth option for find - how deep go into folder structure [default = 1]" 
-	echo " -f : filer by quality and length [default = 1, set to 0 to trim adapters only]"
+	echo " -o : output dir [defaults to input dir]"
+	echo " -t : threads [default=$threads]"
+	echo " -l : library type (one of TruSeqHT, Nextera, dUTP) [default=$LIBRARY_TYPE]"
+	echo " -q : min quality for filtering [default=$min_quality]"
+	echo " -m : min length (-m option in cutadapt) [default=$min_length]"
+	echo " -n : adapter count (-n option in cutadapt) [default=$cutadapt_count]"
+	echo " -N : are data coming from NextSeq (default=$NextSeq, force use of --nextseq_trim instead of -q)"
+	echo " -d : -maxdepth option for find - how deep go into folder structure [default = $find_maxdepth]" 
+	echo " -f : filer by quality and length [default = $filter_quality, set to 0 to trim adapters only]"
 	echo " -h : THIS HELP"
 	echo ""
 }
