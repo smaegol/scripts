@@ -25,41 +25,28 @@
 ### Global variables - do not modify
 INPUT_DIR="." # default input dir - current dir
 OUTPUT_DIR="." # default output dir - current dir
-LIBRARY_TYPE="TruSeqHT" # default library type
-find_maxdepth=1
-filter_quality=1
-#Arrays containing adapter sequences
-declare -A adapter2=( 
- [TruSeqHT]="AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTNNNNNNNNGTGTAGATCTCGGTGGTCGCCGTATCATT"  
- [Nextera]="CTGTCTCTTATACACATCTGACGCTGCCGACGANNNNNNNNGTGTAGATCTCGGTGGTCGCCGTATCATT"  
- [dUTP]="AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTCGGTGGTCGCCGTATCATT"
-)
-declare -A adapter1=( 
- [TruSeqHT]="AGATCGGAAGAGCACACGTCTGAACTCCAGTCACNNNNNNNNATCTCGTATGCCGTCTTCTGCTTG"  
- [Nextera]="CTGTCTCTTATACACATCTCCGAGCCCACGAGACNNNNNNNNATCTCGTATGCCGTCTTCTGCTTG"  
- [dUTP]="AGATCGGAAGAGCACACGTCTGAACTCCAGTCACNNNNNNATCTCGTATGCCGTCTTCTGCTTG"
-)
+GENCODE_REF="/home/smaegol/data/indexes/Mus/annotation/gencode.vM19.annotation.gtf"
 
 ### other variables
-cutadapt_error_rate='0.1' #error rate in overlapping fragment
-cutadapt_count='3' #number of adapters
-cutadapt_overlap='3' #length of min adapter overlap
-
-min_quality='20' #quality threshold 
-min_length='30' #minimum length after trimming
-
+format="bam"
+order="pos"
+feature_type="exon"
+id_attribute="gene_id"
+additional_attribute="gene_name"
+mode="union"
+nonunique="none"
+stranded="yes"
 threads='20' #number of parallel threads to use 
 
-NextSeq=1
 
 function help {
-	echo "Cutadapt processing of paired fastq files in given folder"
+	echo "Count reads using HTSeq-count"
 	echo ""
 	echo "Options :"
 	echo " -i : input directory [required]. Can be set as . to process current dir"
 	echo " -o : output dir [defaults to input dir]"
 	echo " -t : threads [default=$threads]"
-	echo " -l : library type (one of TruSeqHT, Nextera, dUTP) [default=$LIBRARY_TYPE]"
+	echo " -s : stranded [yes/no/reverse]"
 	echo " -q : min quality for filtering [default=$min_quality]"
 	echo " -m : min length (-m option in cutadapt) [default=$min_length]"
 	echo " -n : adapter count (-n option in cutadapt) [default=$cutadapt_count]"
@@ -131,14 +118,6 @@ if [ $OPTIND -eq 1 ]; then
 	exit 1 
 fi
 
-if [ -n "${adapter1[$LIBRARY_TYPE]}" ]; then
-	adapter1=${adapter1[$LIBRARY_TYPE]}
-	adapter2=${adapter2[$LIBRARY_TYPE]}
-else
-	echo "Wrong library type provided. Exiting..."
-	exit 1
-fi
-
 # if using default OUTPUT DIR - set it to INPUT DIR
 if [ "$OUTPUT_DIR" == "." ]; then
 	OUTPUT_DIR=$INPUT_DIR
@@ -149,47 +128,20 @@ if [ ! -d "$OUTPUT_DIR" ]; then
 	mkdir $OUTPUT_DIR
 fi
 
-if [ $NextSeq -eq 1 ]; then
-	echo "Setting quality filtering for NextSeq data (--nextseq_trim==$min_quality)"
-	quality_option="--nextseq-trim"
-else
-	echo "Setting quality filtering for data other than NextSeq (--quality-cutoff==$min_quality)"
-	quality_option="--quality-cutoff"
-fi
-
+LOG_FILE=$OUTPUT_DIR"/count_reads.log"
 
 
 #### load modules (on the server I'm using environmental modules. Will load the most recent version of cutadapt (tested on 1.18)
-module load cutadapt
-module load fastqc
+module load htseq
 
-for R1_FILE in `find $INPUT_DIR -maxdepth $find_maxdepth -name "*R1*.fastq*"`
+for BAM_FILE in `find $INPUT_DIR -name "*.bam"`
 do
-	R1_FILENAME=`expr match "$R1_FILE" '.*\/\(.*\)'`
-	R1_PREFIX=`expr match "$R1_FILENAME" '\(.*\)R1.*'`
-	R1_SUFFIX=`expr match "$R1_FILENAME" '.*R1\(.*\)'`
-	R2_FILE=$INPUT_DIR"/"$R1_PREFIX"R2"$R1_SUFFIX
-	if [ $filter_quality -eq 1 ]; then
-		R1_CUTADAPT_OUTPUT=$OUTPUT_DIR"/"$R1_PREFIX"R1_cutadapt_q"$min_quality"_l"$min_length".fastq.gz"
-		R2_CUTADAPT_OUTPUT=$OUTPUT_DIR"/"$R1_PREFIX"R2_cutadapt_q"$min_quality"_l"$min_length".fastq.gz"
-	else 
-		R1_CUTADAPT_OUTPUT=$OUTPUT_DIR"/"$R1_PREFIX"R1_cutadapt.fastq.gz"
-		R2_CUTADAPT_OUTPUT=$OUTPUT_DIR"/"$R1_PREFIX"R2_cutadapt.fastq.gz"
-	fi
-	cutadapt_log=$OUTPUT_DIR"/"$R1_PREFIX"cutadapt.log"
-	echo "processing files: $R1_FILE and $R2_FILE"
-
-	if [ $filter_quality -eq 1 ]; then
-		if [ ! -e "$R2_CUTADAPT_OUTPUT" ]; then # Run cutadapt only if output is missing	
-			cutadapt -j $threads -a $adapter1 -A $adapter2 -o $R1_CUTADAPT_OUTPUT -p $R2_CUTADAPT_OUTPUT $quality_option=$min_quality -m $min_length -n $cutadapt_count -e $cutadapt_error_rate -O $cutadapt_overlap $R1_FILE $R2_FILE &> $cutadapt_log
-		fi
-	else
-echo "cutadapt -j $threads -a $adapter1 -A $adapter2 -o $R1_CUTADAPT_OUTPUT -p $R2_CUTADAPT_OUTPUT $quality_option=$min_quality -m $min_length -n $cutadapt_count -e $cutadapt_error_rate -O $cutadapt_overlap $R1_FILE $R2_FILE &> $cutadapt_log
-"
-		if [ ! -e "$R2_CUTADAPT_OUTPUT" ]; then # Run cutadapt only if output is missing	
-			cutadapt -j $threads -a $adapter1 -A $adapter2 -o $R1_CUTADAPT_OUTPUT -p $R2_CUTADAPT_OUTPUT -n $cutadapt_count -e $cutadapt_error_rate -O $cutadapt_overlap $R1_FILE $R2_FILE &> $cutadapt_log
-		fi
-	fi
+	BAM_FILENAME=`expr match "$BAM_FILE" '.*\/\(.*\)'`
+	BAM_PREFIX=`expr match "$BAM_FILENAME" '\(.*\).bam'`
+	HTSEQ_OUT=$OUTPUT_DIR"/"$BAM_PREFIX".htseq.txt"
+	echo "$BAM_FILE"
+	htseq-count -m $mode -f $format -r $order -s $stranded -t $feature_type -i $id_attribute --additional-attr $additional_attribute --nonunique $nonunique $BAM_FILE $GENCODE_REF > $HTSEQ_OUT
+	
 done
 #Perform quality check after filtering
-fastqc -t $threads --noextract $OUTPUT_DIR/*cutadapt*.fastq.gz
+

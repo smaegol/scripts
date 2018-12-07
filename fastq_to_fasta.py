@@ -24,7 +24,7 @@ import argparse
 
 parser = argparse.ArgumentParser(
     description='Convert fastq to fasta')
-
+	
 parser.add_argument('--input', dest='inputfile', action='store',
                     help='Input fastq file (required)', required=True)
 parser.add_argument('--output', dest='outputfile', action='store',
