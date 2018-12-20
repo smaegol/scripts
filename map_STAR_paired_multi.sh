@@ -46,7 +46,7 @@ output_unmapped=1
 limit_bam_sort_ram=5000000000 # required to be >0 if using genomeLoad other than NoShared and outputting Sorted Bam
 output_wiggle=1 # default to 1 - outputs wiggle (take some time and disk space)
 additional_suffix=""
-
+paired=1
 
 function help {
 	echo "STAR mapping script"
@@ -61,6 +61,7 @@ function help {
 #	echo " -s : convert to sorted bam using samtools [default=1]"
 	echo " -d : -maxdepth option for find - how deep go into folder structure [default = $find_maxdepth]" 
 	echo " -p : additional suffix to add to output files (to differentiate different runs) [default = empty]"
+	echo " -r : are reads paired? (default=1)"
 	echo " -u : output unmapped reads [default = 1]"
 	echo " -w : output wiggle [default = 1]"
 	echo " -h : THIS HELP"
@@ -68,7 +69,7 @@ function help {
 }
 
 #Get variables from command line
-while getopts ":o:i:t:c:a:g:hd:p:u:w:" optname
+while getopts ":o:i:t:c:a:g:hd:p:r:u:w:" optname
   do
     case "$optname" in
 	"h")
@@ -101,6 +102,9 @@ while getopts ":o:i:t:c:a:g:hd:p:u:w:" optname
 	        ;;
 	"p")
         	additional_suffix=$OPTARG
+	        ;;
+	"r")
+        	paired=$OPTARG
 	        ;;
 	"u")
         	output_unmapped=$OPTARG
@@ -160,7 +164,11 @@ do
 	R1_FILENAME=`expr match "$R1_FILE" '.*\/\(.*\)'`	
 	R1_PREFIX=`expr match "$R1_FILENAME" '\(.*\)R1.*'`
 	R1_SUFFIX=`expr match "$R1_FILENAME" '.*R1\(.*\)'`
-	R2_FILE=$INPUT_DIR"/"$R1_PREFIX"R2"$R1_SUFFIX
+	if [ $paired -eq 1 ]; then
+		R2_FILE=$INPUT_DIR"/"$R1_PREFIX"R2"$R1_SUFFIX
+	else
+		R2_FILE=''
+	fi
 	STAR_PREFIX=$OUT_DIR"/"$R1_PREFIX"_"$additional_suffix
 	if [ "$out_sam_type" == "BAM SortedByCoordinate" ] ; then
 		STAR_SAM_OUTPUT=$STAR_PREFIX"Aligned.sortedByCoord.out.bam"
@@ -173,7 +181,11 @@ do
 	if [ "$IS_GZIPPED_INPUT" == '' ]; then
 		read_files_command=""
 	fi
-	echo "Mapping files: $R1_FILE and $R2_FILE."
+	if [ $paired -eq 1 ]; then
+		echo "Mapping files: $R1_FILE and $R2_FILE"
+	else 
+		echo "Mapping file: $R1_FILE (single mode)"
+	fi
 	echo "Results will be stored in $OUT_DIR"
 	#map using STAR:
 	if [ ! -e "$STAR_SAM_OUTPUT" ]; 

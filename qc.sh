@@ -110,13 +110,17 @@ do
 	BAM_FILENAME=`expr match "$BAM_FILE" '.*\/\(.*\)'`
 	BAM_PREFIX=`expr match "$BAM_FILENAME" '\(.*\).bam'`
 	QORTS_OUT=$QORTS_OUTDIR"/"$BAM_PREFIX
+	if [ ! -e "$BAM_FILE.bai" ] ; then
+		echo "Bam file $BAM_FILE is not indexed. Generating index now..."
+		samtools index $BAM_FILE
+	fi
 	#generate idxstats
 	if [ ! -e $BAM_FILE".idxstats" ]; then
 		echo "generating idxstats of $BAM_FILE"
 		samtools idxstats -@ $threads $BAM_FILE > $BAM_FILE".idxstats"
 	fi
 	#RSEQC stats:
-	if [ ! -e $BAM_FILE".idxstats" ]; then
+	if [ ! -e $BAM_FILE".infer_experiment" ]; then
 		echo "inferring experiment of $BAM_FILE"
 		infer_experiment.py -i $BAM_FILE -r $GENE_BODY_REF > $BAM_FILE".infer_experiment"
 	fi

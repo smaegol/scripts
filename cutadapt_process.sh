@@ -51,6 +51,7 @@ min_length='30' #minimum length after trimming
 threads='20' #number of parallel threads to use 
 
 NextSeq=1
+paired=1
 
 function help {
 	echo "Cutadapt processing of paired fastq files in given folder"
@@ -60,6 +61,7 @@ function help {
 	echo " -o : output dir [defaults to input dir]"
 	echo " -t : threads [default=$threads]"
 	echo " -l : library type (one of TruSeqHT, Nextera, dUTP) [default=$LIBRARY_TYPE]"
+	echo " -p : are data paired? (default=1)"
 	echo " -q : min quality for filtering [default=$min_quality]"
 	echo " -m : min length (-m option in cutadapt) [default=$min_length]"
 	echo " -n : adapter count (-n option in cutadapt) [default=$cutadapt_count]"
@@ -71,7 +73,7 @@ function help {
 }
 
 #Get variables from command line
-while getopts ":hi:o:l:t:q:n:m:d:f:N:" optname
+while getopts ":hi:o:l:t:q:n:m:d:p:f:N:" optname
   do
     case "$optname" in
 	"h")
@@ -104,6 +106,9 @@ while getopts ":hi:o:l:t:q:n:m:d:f:N:" optname
 	        ;;
 	"f")
         	filter_quality=$OPTARG
+	        ;;
+	"p")
+        	paired=$OPTARG
 	        ;;
 	"N")
         	NextSeq=$OPTARG
@@ -168,26 +173,46 @@ do
 	R1_FILENAME=`expr match "$R1_FILE" '.*\/\(.*\)'`
 	R1_PREFIX=`expr match "$R1_FILENAME" '\(.*\)R1.*'`
 	R1_SUFFIX=`expr match "$R1_FILENAME" '.*R1\(.*\)'`
-	R2_FILE=$INPUT_DIR"/"$R1_PREFIX"R2"$R1_SUFFIX
+	if [ $paired -eq 1 ]; then
+		R2_FILE=$INPUT_DIR"/"$R1_PREFIX"R2"$R1_SUFFIX
+	fi
 	if [ $filter_quality -eq 1 ]; then
 		R1_CUTADAPT_OUTPUT=$OUTPUT_DIR"/"$R1_PREFIX"R1_cutadapt_q"$min_quality"_l"$min_length".fastq.gz"
-		R2_CUTADAPT_OUTPUT=$OUTPUT_DIR"/"$R1_PREFIX"R2_cutadapt_q"$min_quality"_l"$min_length".fastq.gz"
+		if [ $paired -eq 1 ]; then
+			R2_CUTADAPT_OUTPUT=$OUTPUT_DIR"/"$R1_PREFIX"R2_cutadapt_q"$min_quality"_l"$min_length".fastq.gz"
+		fi
 	else 
 		R1_CUTADAPT_OUTPUT=$OUTPUT_DIR"/"$R1_PREFIX"R1_cutadapt.fastq.gz"
-		R2_CUTADAPT_OUTPUT=$OUTPUT_DIR"/"$R1_PREFIX"R2_cutadapt.fastq.gz"
+		if [ $paired -eq 1 ]; then
+			R2_CUTADAPT_OUTPUT=$OUTPUT_DIR"/"$R1_PREFIX"R2_cutadapt.fastq.gz"
+		fi
 	fi
 	cutadapt_log=$OUTPUT_DIR"/"$R1_PREFIX"cutadapt.log"
-	echo "processing files: $R1_FILE and $R2_FILE"
+	if [ $paired -eq 1 ]; then
+		echo "processing files: $R1_FILE and $R2_FILE"
+	else 
+		echo "processing file: $R1_FILE"
+	fi
 
 	if [ $filter_quality -eq 1 ]; then
-		if [ ! -e "$R2_CUTADAPT_OUTPUT" ]; then # Run cutadapt only if output is missing	
-			cutadapt -j $threads -a $adapter1 -A $adapter2 -o $R1_CUTADAPT_OUTPUT -p $R2_CUTADAPT_OUTPUT $quality_option=$min_quality -m $min_length -n $cutadapt_count -e $cutadapt_error_rate -O $cutadapt_overlap $R1_FILE $R2_FILE &> $cutadapt_log
+		if [ $paired -eq 1 ]; then
+			if [ ! -e "$R2_CUTADAPT_OUTPUT" ]; then # Run cutadapt only if output is missing	
+				cutadapt -j $threads -a $adapter1 -A $adapter2 -o $R1_CUTADAPT_OUTPUT -p $R2_CUTADAPT_OUTPUT $quality_option=$min_quality -m $min_length -n $cutadapt_count -e $cutadapt_error_rate -O $cutadapt_overlap $R1_FILE $R2_FILE &> $cutadapt_log
+			fi
+		else
+			if [ ! -e "$R1_CUTADAPT_OUTPUT" ]; then # Run cutadapt only if output is missing	
+				cutadapt -j $threads -a $adapter1 -o $R1_CUTADAPT_OUTPUT $quality_option=$min_quality -m $min_length -n $cutadapt_count -e $cutadapt_error_rate -O $cutadapt_overlap $R1_FILE &> $cutadapt_log
+			fi
 		fi
 	else
-echo "cutadapt -j $threads -a $adapter1 -A $adapter2 -o $R1_CUTADAPT_OUTPUT -p $R2_CUTADAPT_OUTPUT $quality_option=$min_quality -m $min_length -n $cutadapt_count -e $cutadapt_error_rate -O $cutadapt_overlap $R1_FILE $R2_FILE &> $cutadapt_log
-"
-		if [ ! -e "$R2_CUTADAPT_OUTPUT" ]; then # Run cutadapt only if output is missing	
-			cutadapt -j $threads -a $adapter1 -A $adapter2 -o $R1_CUTADAPT_OUTPUT -p $R2_CUTADAPT_OUTPUT -n $cutadapt_count -e $cutadapt_error_rate -O $cutadapt_overlap $R1_FILE $R2_FILE &> $cutadapt_log
+		if [ $paired -eq 1 ]; then
+			if [ ! -e "$R2_CUTADAPT_OUTPUT" ]; then # Run cutadapt only if output is missing	
+				cutadapt -j $threads -a $adapter1 -A $adapter2 -o $R1_CUTADAPT_OUTPUT -p $R2_CUTADAPT_OUTPUT -n $cutadapt_count -e $cutadapt_error_rate -O $cutadapt_overlap $R1_FILE $R2_FILE &> $cutadapt_log
+			fi
+		else
+			if [ ! -e "$R1_CUTADAPT_OUTPUT" ]; then # Run cutadapt only if output is missing	
+				cutadapt -j $threads -a $adapter1 -o $R1_CUTADAPT_OUTPUT -n $cutadapt_count -e $cutadapt_error_rate -O $cutadapt_overlap $R1_FILE  &> $cutadapt_log
+			fi
 		fi
 	fi
 done
