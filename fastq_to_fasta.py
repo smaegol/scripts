@@ -32,6 +32,7 @@ parser.add_argument('--output', dest='outputfile', action='store',
 args = parser.parse_args()
 
 
+
 with open(args.inputfile, "rU") as input_handle:
     with open(args.outputfile,"w") as output_handle:
         sequences = SeqIO.parse(input_handle, "fastq")
