@@ -111,7 +111,7 @@ else:
 if (args.output_tsv):
     output_table = pd.DataFrame() # pandas data frame to store all results
 with open(args.output_fasta,"w") as output_file:
-    for row in query.results(size=10,row="dict"):
+    for row in query.results(size=limit_hits,row="dict"):
         if (args.output_tsv):
             results_pd = pd.Series(row)
             output_table = output_table.append(results_pd,ignore_index=True)
