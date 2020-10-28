@@ -62,7 +62,7 @@ function help {
 	echo " -i : input directory [required]. Can be set as . to process current dir"
 	echo " -o : output dir [defaults to input dir]"
 	echo " -t : threads [default=$threads]"
-	echo " -l : library type (one of TruSeqHT, Nextera, dUTP) [default=$LIBRARY_TYPE]"
+	echo " -l : library type (one of TruSeqHT, Nextera, dUTP, TruSeqUD) [default=$LIBRARY_TYPE]"
 	echo " -p : are data paired? (default=1)"
 	echo " -q : min quality for filtering [default=$min_quality]"
 	echo " -m : min length (-m option in cutadapt) [default=$min_length]"
