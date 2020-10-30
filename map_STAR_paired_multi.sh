@@ -194,5 +194,5 @@ do
 	fi
 done
 # remove shared genome from the memory - cleaning after mapping
-STAR --genomeDir $GENOME_DIR --genomeLoad remove 
+STAR --genomeDir $GENOME_DIR --genomeLoad Remove 
 echo "Finished processing"
